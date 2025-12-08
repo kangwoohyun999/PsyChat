@@ -36,10 +36,10 @@ export default function HomeScreen({ navigation }) {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      
+
       const [entries, recentStats] = await Promise.all([
         getEntries(),
-        getStatsByDateRange(30), // 최근 30일 통계
+        getStatsByDateRange(30),
       ]);
 
       if (entries.length === 0) {
@@ -50,32 +50,39 @@ export default function HomeScreen({ navigation }) {
         return;
       }
 
-      // 전체 기간 감정 비율 계산
       const posScore = entries.reduce(
-        (acc, e) => 
-          acc + (e.sentiment?.label === "positive" || 
-                 e.sentiment?.label === "very_positive" ? 1 : 0),
+        (acc, e) =>
+          acc +
+          (e.sentiment?.label === "positive" ||
+          e.sentiment?.label === "very_positive"
+            ? 1
+            : 0),
         0
       );
+
       const negScore = entries.reduce(
-        (acc, e) => 
-          acc + (e.sentiment?.label === "negative" || 
-                 e.sentiment?.label === "very_negative" ? 1 : 0),
+        (acc, e) =>
+          acc +
+          (e.sentiment?.label === "negative" ||
+          e.sentiment?.label === "very_negative"
+            ? 1
+            : 0),
         0
       );
+
       const neuScore = entries.reduce(
         (acc, e) => acc + (e.sentiment?.label === "neutral" ? 1 : 0),
         0
       );
 
       const total = entries.length;
-      setPositiveRatio(total > 0 ? posScore / total : 0);
-      setNegativeRatio(total > 0 ? negScore / total : 0);
-      setNeutralRatio(total > 0 ? neuScore / total : 0);
+
+      setPositiveRatio(posScore / total);
+      setNegativeRatio(negScore / total);
+      setNeutralRatio(neuScore / total);
       setStats(recentStats);
-      
-    } catch (error) {
-      console.error("데이터 로딩 실패:", error);
+    } catch (err) {
+      console.error("데이터 로딩 실패:", err);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -90,7 +97,7 @@ export default function HomeScreen({ navigation }) {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
+        <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color="#4A90E2" />
           <Text style={styles.loadingText}>불러오는 중...</Text>
         </View>
@@ -101,89 +108,49 @@ export default function HomeScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={onRefresh}
-            colors={["#4A90E2"]}
-          />
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
         }
       >
-        {/* 헤더 */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>안녕하세요! 👋</Text>
-            <Text style={styles.subtitle}>오늘의 감정을 기록해보세요</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.settingsBtn}
-            onPress={() => {
-              // TODO: 설정 화면 구현
-            }}
-          >
-            <Ionicons name="settings-outline" size={24} color="#2C3E50" />
-          </TouchableOpacity>
+        {/* 타이틀 */}
+        <Text style={styles.title}>오늘의 감정 상태</Text>
+
+        {/* 파이차트 + 비율 */}
+        <View style={styles.chartWrap}>
+          <PieChartComponent
+            positive={positiveRatio}
+            negative={negativeRatio}
+            neutral={neutralRatio}
+          />
+
+          <Text style={styles.ratioText}>
+            긍정 {Math.round(positiveRatio * 100)}% ・ 부정{" "}
+            {Math.round(negativeRatio * 100)}% ・ 중립{" "}
+            {Math.round(neutralRatio * 100)}%
+          </Text>
         </View>
 
-        {/* 전체 누적 통계 */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>전체 누적 통계</Text>
-          
-          <View style={styles.chartCard}>
-            <PieChartComponent
-              positive={positiveRatio}
-              negative={negativeRatio}
-              neutral={neutralRatio}
-              showLegend={false}
-            />
-            
-            <View style={styles.ratioContainer}>
-              <View style={styles.ratioItem}>
-                <View style={[styles.ratioColor, { backgroundColor: "#34D399" }]} />
-                <Text style={styles.ratioText}>
-                  긍정 {Math.round(positiveRatio * 100)}%
-                </Text>
-              </View>
-              <View style={styles.ratioItem}>
-                <View style={[styles.ratioColor, { backgroundColor: "#F59E0B" }]} />
-                <Text style={styles.ratioText}>
-                  부정 {Math.round(negativeRatio * 100)}%
-                </Text>
-              </View>
-              {neutralRatio > 0 && (
-                <View style={styles.ratioItem}>
-                  <View style={[styles.ratioColor, { backgroundColor: "#94A3B8" }]} />
-                  <Text style={styles.ratioText}>
-                    중립 {Math.round(neutralRatio * 100)}%
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
+        {/* 최근 30일 카드 */}
+        {stats && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>최근 30일 기록</Text>
 
-        {/* 최근 30일 통계 */}
-        {stats && stats.total > 0 && (
-          <View style={styles.recentStatsSection}>
-            <Text style={styles.sectionTitle}>최근 30일</Text>
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <Ionicons name="document-text" size={28} color="#4A90E2" />
-                <Text style={styles.statValue}>{stats.total}</Text>
-                <Text style={styles.statLabel}>일기</Text>
+            <View style={styles.statRow}>
+              <View style={styles.statBox}>
+                <Text style={styles.statNumber}>{stats.total}</Text>
+                <Text style={styles.statLabel}>총 일기</Text>
               </View>
-              <View style={styles.statCard}>
-                <Ionicons name="happy" size={28} color="#10B981" />
-                <Text style={[styles.statValue, { color: "#10B981" }]}>
+
+              <View style={styles.statBox}>
+                <Text style={[styles.statNumber, { color: "#3c55e2ff" }]}>
                   {stats.positive}
                 </Text>
                 <Text style={styles.statLabel}>긍정</Text>
               </View>
-              <View style={styles.statCard}>
-                <Ionicons name="sad" size={28} color="#F59E0B" />
-                <Text style={[styles.statValue, { color: "#F59E0B" }]}>
+
+              <View style={styles.statBox}>
+                <Text style={[styles.statNumber, { color: "#F87171" }]}>
                   {stats.negative}
                 </Text>
                 <Text style={styles.statLabel}>부정</Text>
@@ -192,58 +159,42 @@ export default function HomeScreen({ navigation }) {
           </View>
         )}
 
-        {/* 빠른 메뉴 */}
-        <View style={styles.quickMenuSection}>
+        {/* 빠른 메뉴 (그래프 / 기록 / 캘린더) */}
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>빠른 메뉴</Text>
-          
-          <View style={styles.menuGrid}>
+
+          <View style={styles.menuRow}>
             <TouchableOpacity
-              style={styles.menuCard}
+              style={styles.menuButton}
               onPress={() => navigation.navigate("Graph")}
             >
-              <View style={[styles.menuIcon, { backgroundColor: "#E8F4FD" }]}>
-                <Ionicons name="stats-chart" size={28} color="#4A90E2" />
-              </View>
-              <Text style={styles.menuTitle}>통계</Text>
-              <Text style={styles.menuDesc}>감정 변화 분석</Text>
+              <Text style={styles.menuText}>통계 그래프</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.menuCard}
+              style={styles.menuButton}
               onPress={() => navigation.navigate("History")}
             >
-              <View style={[styles.menuIcon, { backgroundColor: "#FEF3E8" }]}>
-                <Ionicons name="book" size={28} color="#F59E0B" />
-              </View>
-              <Text style={styles.menuTitle}>기록</Text>
-              <Text style={styles.menuDesc}>지난 일기 보기</Text>
+              <Text style={styles.menuText}>기록 보기</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.menuCard}
+              style={styles.menuButton}
               onPress={() => navigation.navigate("Calendar")}
             >
-              <View style={[styles.menuIcon, { backgroundColor: "#F0FDF4" }]}>
-                <Ionicons name="calendar" size={28} color="#10B981" />
-              </View>
-              <Text style={styles.menuTitle}>캘린더</Text>
-              <Text style={styles.menuDesc}>날짜별 감정</Text>
+              <Text style={styles.menuText}>캘린더</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* 일기 작성 버튼 */}
-        <View style={styles.bottomSection}>
-          <Text style={styles.promptText}>
-            오늘은 어떤 하루였나요?
-          </Text>
-
+        <View style={styles.writeWrap}>
           <TouchableOpacity
             style={styles.writeBtn}
             onPress={() => navigation.navigate("Chat")}
           >
-            <Ionicons name="create" size={24} color="#ffffff" />
-            <Text style={styles.writeBtnText}>일기 작성하기</Text>
+            <Ionicons name="create" size={22} color="#fff" />
+            <Text style={styles.writeText}>일기 작성하기</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -252,180 +203,86 @@ export default function HomeScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F7FA",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: "#7F8C8D",
-  },
-  scrollContent: {
-    paddingBottom: 30,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-  },
-  greeting: {
-    fontSize: 28,
+  container: { flex: 1, backgroundColor: "#F7F7F7" },
+
+  title: {
+    fontSize: 26,
     fontWeight: "700",
-    color: "#2C3E50",
-    marginBottom: 4,
+    marginTop: 30,
+    textAlign: "center",
+    color: "#333",
   },
-  subtitle: {
-    fontSize: 14,
-    color: "#7F8C8D",
+
+  chartWrap: {
+    alignItems: "center",
+    marginVertical: 20,
   },
-  settingsBtn: {
-    padding: 8,
+
+  ratioText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
   },
-  statsSection: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
+
+  section: { paddingHorizontal: 20, marginTop: 20 },
+
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#2C3E50",
-    marginBottom: 12,
+    color: "#333",
+    marginBottom: 10,
   },
-  chartCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  ratioContainer: {
-    marginTop: 16,
-    gap: 8,
-  },
-  ratioItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  ratioColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-  },
-  ratioText: {
-    fontSize: 15,
-    color: "#2C3E50",
-    fontWeight: "600",
-  },
-  recentStatsSection: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  statCard: {
+
+  statRow: { flexDirection: "row", justifyContent: "space-between" },
+
+  statBox: {
+    backgroundColor: "#fff",
     flex: 1,
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 16,
+    marginHorizontal: 5,
+    paddingVertical: 18,
+    borderRadius: 14,
     alignItems: "center",
     shadowColor: "#000",
     shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    shadowRadius: 6,
   },
-  statValue: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#2C3E50",
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#7F8C8D",
-  },
-  quickMenuSection: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  menuGrid: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  menuCard: {
+
+  statNumber: { fontSize: 22, fontWeight: "700", color: "#333" },
+  statLabel: { fontSize: 12, color: "#777" },
+
+  menuRow: { flexDirection: "row", justifyContent: "space-between" },
+
+  menuButton: {
+    backgroundColor: "#fff",
+    paddingVertical: 16,
     flex: 1,
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 16,
+    marginHorizontal: 5,
+    borderRadius: 14,
     alignItems: "center",
-    shadowColor: "#000",
     shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    shadowRadius: 6,
   },
-  menuIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  menuTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#2C3E50",
-    marginBottom: 4,
-  },
-  menuDesc: {
-    fontSize: 11,
-    color: "#7F8C8D",
-    textAlign: "center",
-  },
-  bottomSection: {
-    paddingHorizontal: 20,
-    alignItems: "center",
-  },
-  promptText: {
-    fontSize: 16,
-    color: "#7F8C8D",
-    marginBottom: 16,
-    textAlign: "center",
-  },
+
+  menuText: { fontSize: 15, fontWeight: "600", color: "#333" },
+
+  writeWrap: { alignItems: "center", marginVertical: 30 },
+
   writeBtn: {
     flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "#4A90E2",
-    paddingHorizontal: 32,
+    paddingHorizontal: 28,
     paddingVertical: 16,
-    borderRadius: 28,
-    gap: 12,
-    shadowColor: "#4A90E2",
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
+    borderRadius: 30,
+    alignItems: "center",
   },
-  writeBtnText: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "700",
+
+  writeText: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "600",
+    marginLeft: 10,
   },
+
+  loadingWrap: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { marginTop: 10, color: "#777" },
 });

@@ -13,22 +13,29 @@ const KEYS = {
  * @param {Object} entry - 일기 항목
  * @returns {Promise<boolean>}
  */
+export function getKSTDateString(date = new Date()) {
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10);
+}
+
 export async function saveEntry(entry) {
   try {
     const entries = await getEntries();
-    
-    // 중복 체크 (같은 ID가 있으면 업데이트)
+
+    // ★ 한국시간 YYYY-MM-DD로 변환해서 저장하도록 강제
+    const kstDate = getKSTDateString(new Date(entry.date));
+    entry.date = `${kstDate}T00:00:00`; // 날자 로그용이면 시간은 고정
+
     const existingIndex = entries.findIndex((e) => e.id === entry.id);
-    
+
     if (existingIndex >= 0) {
       entries[existingIndex] = entry;
     } else {
       entries.push(entry);
     }
-    
-    // 날짜순 정렬 (최신순)
+
     entries.sort((a, b) => new Date(b.date) - new Date(a.date));
-    
+
     await AsyncStorage.setItem(KEYS.ENTRIES, JSON.stringify(entries));
     return true;
   } catch (error) {
@@ -45,7 +52,7 @@ export async function getEntries() {
   try {
     const raw = await AsyncStorage.getItem(KEYS.ENTRIES);
     const entries = raw ? JSON.parse(raw) : [];
-    
+
     // 날짜순 정렬 (최신순)
     return entries.sort((a, b) => new Date(b.date) - new Date(a.date));
   } catch (error) {
@@ -62,7 +69,7 @@ export async function getEntries() {
 export async function getEntriesByDate(dateStr) {
   try {
     const all = await getEntries();
-    return all.filter((e) => e.date.slice(0, 10) === dateStr);
+    return all.filter((e) => getKSTDateString(new Date(e.date)) === dateStr);
   } catch (error) {
     console.error("getEntriesByDate error:", error);
     return [];
@@ -96,9 +103,9 @@ export async function updateEntry(entryId, updates) {
   try {
     const entries = await getEntries();
     const index = entries.findIndex((e) => e.id === entryId);
-    
+
     if (index === -1) return false;
-    
+
     entries[index] = { ...entries[index], ...updates };
     await AsyncStorage.setItem(KEYS.ENTRIES, JSON.stringify(entries));
     return true;
@@ -114,10 +121,7 @@ export async function updateEntry(entryId, updates) {
  */
 export async function clearAllData() {
   try {
-    await AsyncStorage.multiRemove([
-      KEYS.ENTRIES,
-      KEYS.MOOD_COLORS,
-    ]);
+    await AsyncStorage.multiRemove([KEYS.ENTRIES, KEYS.MOOD_COLORS]);
     return true;
   } catch (error) {
     console.error("clearAllData error:", error);
@@ -133,8 +137,11 @@ export async function clearAllData() {
  */
 export async function saveMoodColor(date, moodLabel) {
   try {
+    const kstDate = getKSTDateString(new Date(date)); // ★ 한국 날짜로 변환
+
     const colors = await getMoodColors();
-    colors[date] = moodLabel;
+    colors[kstDate] = moodLabel;
+
     await AsyncStorage.setItem(KEYS.MOOD_COLORS, JSON.stringify(colors));
     return true;
   } catch (error) {
@@ -204,7 +211,7 @@ export async function getStatsByDateRange(days = 30) {
 
     filtered.forEach((entry) => {
       const label = entry.sentiment?.label || "neutral";
-      
+
       switch (label) {
         case "very_positive":
           stats.veryPositive++;
@@ -240,7 +247,7 @@ export async function getStatsByDateRange(days = 30) {
     const sortedKeywords = Object.entries(stats.topKeywords)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10);
-    
+
     stats.topKeywords = Object.fromEntries(sortedKeywords);
 
     return stats;
@@ -265,7 +272,7 @@ export async function getStatsByDateRange(days = 30) {
 export async function computeWordTimeSeries(days = 14) {
   try {
     const all = await getEntries();
-    
+
     if (all.length === 0) {
       return { dates: [], words: [], data: {} };
     }
@@ -308,7 +315,7 @@ export async function computeWordTimeSeries(days = 14) {
 
     dates.forEach((dateStr) => {
       const dayEntries = all.filter((e) => e.date.slice(0, 10) === dateStr);
-      
+
       words.forEach((word) => {
         let sum = 0;
         dayEntries.forEach((e) => {
@@ -337,7 +344,7 @@ export async function computeSentimentTimeSeries(days = 14) {
     const all = await getEntries();
     const today = new Date();
     const dates = [];
-    
+
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
@@ -351,7 +358,7 @@ export async function computeSentimentTimeSeries(days = 14) {
 
     dates.forEach((dateStr) => {
       const dayEntries = all.filter((e) => e.date.slice(0, 10) === dateStr);
-      
+
       let posCount = 0;
       let negCount = 0;
       let neuCount = 0;
@@ -359,7 +366,7 @@ export async function computeSentimentTimeSeries(days = 14) {
 
       dayEntries.forEach((e) => {
         const label = e.sentiment?.label || "neutral";
-        
+
         if (label === "positive" || label === "very_positive") {
           posCount++;
         } else if (label === "negative" || label === "very_negative") {
@@ -374,7 +381,9 @@ export async function computeSentimentTimeSeries(days = 14) {
       positiveData.push(posCount);
       negativeData.push(negCount);
       neutralData.push(neuCount);
-      scoreData.push(dayEntries.length > 0 ? totalScore / dayEntries.length : 0);
+      scoreData.push(
+        dayEntries.length > 0 ? totalScore / dayEntries.length : 0
+      );
     });
 
     return {
@@ -404,7 +413,7 @@ export async function exportData() {
   try {
     const entries = await getEntries();
     const moodColors = await getMoodColors();
-    
+
     const exportData = {
       version: "1.0",
       exportDate: new Date().toISOString(),
@@ -427,15 +436,18 @@ export async function exportData() {
 export async function importData(jsonString) {
   try {
     const data = JSON.parse(jsonString);
-    
+
     if (!data.entries || !Array.isArray(data.entries)) {
       throw new Error("Invalid data format");
     }
 
     await AsyncStorage.setItem(KEYS.ENTRIES, JSON.stringify(data.entries));
-    
+
     if (data.moodColors) {
-      await AsyncStorage.setItem(KEYS.MOOD_COLORS, JSON.stringify(data.moodColors));
+      await AsyncStorage.setItem(
+        KEYS.MOOD_COLORS,
+        JSON.stringify(data.moodColors)
+      );
     }
 
     return true;

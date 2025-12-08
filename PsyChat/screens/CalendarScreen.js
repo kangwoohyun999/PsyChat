@@ -53,21 +53,22 @@ export default function CalendarScreen({ navigation }) {
 
       if (entries.length > 0) {
         // 일기 내용 표시
-        const content = entries.map((e, i) => 
-          `[${i + 1}] ${e.text.substring(0, 100)}${e.text.length > 100 ? '...' : ''}`
-        ).join('\n\n');
-        
-        Alert.alert(
-          dateStr,
-          content || "작성된 일기가 없습니다.",
-          [
-            { text: "닫기" },
-            {
-              text: "일기 작성",
-              onPress: () => navigation.navigate("Chat"),
-            },
-          ]
-        );
+        const content = entries
+          .map(
+            (e, i) =>
+              `[${i + 1}] ${e.text.substring(0, 100)}${
+                e.text.length > 100 ? "..." : ""
+              }`
+          )
+          .join("\n\n");
+
+        Alert.alert(dateStr, content || "작성된 일기가 없습니다.", [
+          { text: "닫기" },
+          {
+            text: "일기 작성",
+            onPress: () => navigation.navigate("Chat"),
+          },
+        ]);
       }
     } catch (error) {
       console.error("일기 로딩 실패:", error);
@@ -108,11 +109,13 @@ export default function CalendarScreen({ navigation }) {
   };
 
   const getColorForDate = (year, month, day) => {
-    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(
+      day
+    ).padStart(2, "0")}`;
     const mood = moodColors[dateStr];
-    
+
     if (!mood) return "#F8F9FA";
-    
+
     return SENTIMENT_COLORS[mood] || "#94A3B8";
   };
 
@@ -121,7 +124,7 @@ export default function CalendarScreen({ navigation }) {
     const year = selectedMonth.getFullYear();
     const month = selectedMonth.getMonth();
     const today = new Date();
-    const isCurrentMonth = 
+    const isCurrentMonth =
       today.getMonth() === month && today.getFullYear() === year;
 
     return (
@@ -150,10 +153,12 @@ export default function CalendarScreen({ navigation }) {
               return <View key={`empty-${index}`} style={styles.dayCell} />;
             }
 
-            const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const dateStr = `${year}-${String(month + 1).padStart(
+              2,
+              "0"
+            )}-${String(day).padStart(2, "0")}`;
             const color = getColorForDate(year, month, day);
-            const isToday = 
-              isCurrentMonth && day === today.getDate();
+            const isToday = isCurrentMonth && day === today.getDate();
             const hasMood = moodColors[dateStr] !== undefined;
             const mood = moodColors[dateStr];
             const emoji = mood ? getLabelEmoji(mood) : "";
@@ -177,34 +182,10 @@ export default function CalendarScreen({ navigation }) {
                 >
                   {day}
                 </Text>
-                {hasMood && (
-                  <Text style={styles.emojiText}>{emoji}</Text>
-                )}
+                {hasMood && <Text style={styles.emojiText}>{emoji}</Text>}
               </TouchableOpacity>
             );
           })}
-        </View>
-      </View>
-    );
-  };
-
-  const renderLegend = () => {
-    return (
-      <View style={styles.legendContainer}>
-        <Text style={styles.legendTitle}>감정 색상 범례</Text>
-        <View style={styles.legendGrid}>
-          {[
-            { label: "매우 긍정", color: SENTIMENT_COLORS.very_positive },
-            { label: "긍정", color: SENTIMENT_COLORS.positive },
-            { label: "중립", color: SENTIMENT_COLORS.neutral },
-            { label: "부정", color: SENTIMENT_COLORS.negative },
-            { label: "매우 부정", color: SENTIMENT_COLORS.very_negative },
-          ].map((item) => (
-            <View key={item.label} style={styles.legendItem}>
-              <View style={[styles.legendColor, { backgroundColor: item.color }]} />
-              <Text style={styles.legendLabel}>{item.label}</Text>
-            </View>
-          ))}
         </View>
       </View>
     );
@@ -269,10 +250,6 @@ export default function CalendarScreen({ navigation }) {
 
         {/* 캘린더 */}
         {renderCalendar()}
-
-        {/* 범례 */}
-        {renderLegend()}
-
         {/* 안내 */}
         <View style={styles.infoBox}>
           <Ionicons name="information-circle" size={20} color="#4A90E2" />

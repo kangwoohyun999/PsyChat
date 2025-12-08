@@ -37,8 +37,6 @@ export default function HistoryScreen({ navigation }) {
     try {
       setIsLoading(true);
       const allEntries = await getEntries();
-      
-      // 선택된 월에 해당하는 항목만 필터링
       const filtered = allEntries.filter((entry) => {
         const entryDate = new Date(entry.date);
         return (
@@ -46,10 +44,9 @@ export default function HistoryScreen({ navigation }) {
           entryDate.getFullYear() === selectedMonth.getFullYear()
         );
       });
-      
+
       setEntries(filtered);
     } catch (error) {
-      console.error("데이터 로딩 실패:", error);
       Alert.alert("오류", "데이터를 불러오는데 실패했습니다.");
     } finally {
       setIsLoading(false);
@@ -62,27 +59,23 @@ export default function HistoryScreen({ navigation }) {
     loadEntries();
   };
 
-  const handleDelete = (entryId, date) => {
-    Alert.alert(
-      "삭제 확인",
-      "이 일기를 삭제하시겠습니까?",
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "삭제",
-          style: "destructive",
-          onPress: async () => {
-            const success = await deleteEntry(entryId);
-            if (success) {
-              setEntries((prev) => prev.filter((e) => e.id !== entryId));
-              Alert.alert("삭제 완료", "일기가 삭제되었습니다.");
-            } else {
-              Alert.alert("오류", "삭제에 실패했습니다.");
-            }
-          },
+  const handleDelete = (entryId) => {
+    Alert.alert("삭제 확인", "이 일기를 삭제하시겠습니까?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: async () => {
+          const success = await deleteEntry(entryId);
+          if (success) {
+            setEntries((prev) => prev.filter((e) => e.id !== entryId));
+            Alert.alert("삭제 완료", "일기가 삭제되었습니다.");
+          } else {
+            Alert.alert("오류", "삭제에 실패했습니다.");
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const changeMonth = (delta) => {
@@ -99,70 +92,64 @@ export default function HistoryScreen({ navigation }) {
     const date = new Date(dateStr);
     const month = date.getMonth() + 1;
     const day = date.getDate();
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
     const days = ["일", "월", "화", "수", "목", "금", "토"];
     const dayName = days[date.getDay()];
-    
-    return `${month}월 ${day}일 (${dayName}) ${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+    return `${month}월 ${day}일 (${dayName}) ${hours}:${minutes}`;
   };
 
   const renderItem = ({ item }) => {
-    const sentiment = item.sentiment || {};
-    const label = sentiment.label || "neutral";
+    const label = item.sentiment?.label || "neutral";
     const emoji = getLabelEmoji(label);
     const labelText = getLabelText(label);
     const color = SENTIMENT_COLORS[label] || "#94A3B8";
 
     return (
       <View style={[styles.card, { borderLeftColor: color }]}>
-        <View style={styles.cardHeader}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.emoji}>{emoji}</Text>
-            <View>
-              <Text style={styles.dateText}>{formatDateTime(item.date)}</Text>
-              <Text style={[styles.sentimentLabel, { color }]}>
-                {labelText} {sentiment.score ? `(${sentiment.score.toFixed(2)})` : ""}
-              </Text>
-            </View>
-          </View>
+        {/* 1) 삭제 버튼 — 카드 오른쪽 위, 절대 위치, 다른 View 위에 올라감 */}
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={() => handleDelete(item.id)}
+        >
+          <Ionicons name="trash-outline" size={22} color="#E74C3C" />
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => handleDelete(item.id, item.date)}
-          >
-            <Ionicons name="trash-outline" size={20} color="#E74C3C" />
-          </TouchableOpacity>
+        {/* 2) 카드 내용 */}
+        <View style={styles.cardHeader}>
+          <Text style={styles.emoji}>{emoji}</Text>
+          <View>
+            <Text style={styles.dateText}>{formatDateTime(item.date)}</Text>
+            <Text style={[styles.sentimentLabel, { color }]}>
+              {labelText}{" "}
+              {item.sentiment?.score
+                ? `(${item.sentiment.score.toFixed(2)})`
+                : ""}
+            </Text>
+          </View>
         </View>
 
         <Text style={styles.contentText} numberOfLines={3}>
           {item.text}
         </Text>
 
-        {item.keywords && item.keywords.length > 0 && (
+        {item.keywords?.length > 0 && (
           <View style={styles.keywordsContainer}>
-            {item.keywords.slice(0, 5).map((keyword, index) => (
-              <View key={index} style={styles.keywordBadge}>
-                <Text style={styles.keywordText}>#{keyword}</Text>
+            {item.keywords.slice(0, 5).map((kw, i) => (
+              <View key={i} style={styles.keywordBadge}>
+                <Text style={styles.keywordText}>#{kw}</Text>
               </View>
             ))}
-            {item.keywords.length > 5 && (
-              <Text style={styles.moreKeywords}>
-                +{item.keywords.length - 5}
-              </Text>
-            )}
           </View>
         )}
 
         <TouchableOpacity
           style={styles.viewMoreBtn}
-          onPress={() => {
-            Alert.alert(
-              formatDateTime(item.date),
-              item.text,
-              [{ text: "확인" }]
-            );
-          }}
+          onPress={() =>
+            Alert.alert(formatDateTime(item.date), item.text, [
+              { text: "확인" },
+            ])
+          }
         >
           <Text style={styles.viewMoreText}>전체 보기</Text>
           <Ionicons name="chevron-forward" size={16} color="#4A90E2" />
@@ -180,18 +167,14 @@ export default function HistoryScreen({ navigation }) {
 
       {/* 월 선택 */}
       <View style={styles.monthSelector}>
-        <TouchableOpacity
-          onPress={() => changeMonth(-1)}
-          style={styles.monthBtn}
-        >
-          <Ionicons name="chevron-back" size={24} color="#4A90E2" />
+        <TouchableOpacity onPress={() => changeMonth(-1)}>
+          <Ionicons name="chevron-back" size={28} color="#4A90E2" />
         </TouchableOpacity>
 
         <Text style={styles.monthText}>{formatMonthYear(selectedMonth)}</Text>
 
         <TouchableOpacity
           onPress={() => changeMonth(1)}
-          style={styles.monthBtn}
           disabled={
             selectedMonth.getMonth() === new Date().getMonth() &&
             selectedMonth.getFullYear() === new Date().getFullYear()
@@ -199,41 +182,14 @@ export default function HistoryScreen({ navigation }) {
         >
           <Ionicons
             name="chevron-forward"
-            size={24}
+            size={28}
             color={
-              selectedMonth.getMonth() === new Date().getMonth() &&
-              selectedMonth.getFullYear() === new Date().getFullYear()
-                ? "#BDC3C7"
+              selectedMonth.getMonth() === new Date().getMonth()
+                ? "#CCC"
                 : "#4A90E2"
             }
           />
         </TouchableOpacity>
-      </View>
-
-      {/* 통계 요약 */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{entries.length}</Text>
-          <Text style={styles.statLabel}>전체</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: SENTIMENT_COLORS.positive }]}>
-            {entries.filter((e) => 
-              e.sentiment?.label === "positive" || 
-              e.sentiment?.label === "very_positive"
-            ).length}
-          </Text>
-          <Text style={styles.statLabel}>긍정</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: SENTIMENT_COLORS.negative }]}>
-            {entries.filter((e) => 
-              e.sentiment?.label === "negative" || 
-              e.sentiment?.label === "very_negative"
-            ).length}
-          </Text>
-          <Text style={styles.statLabel}>부정</Text>
-        </View>
       </View>
 
       {/* 리스트 */}
@@ -246,16 +202,9 @@ export default function HistoryScreen({ navigation }) {
         <View style={styles.emptyContainer}>
           <Ionicons name="document-text-outline" size={64} color="#BDC3C7" />
           <Text style={styles.emptyText}>
-            {formatMonthYear(selectedMonth)}에{"\n"}
-            작성된 일기가 없습니다.
+            {formatMonthYear(selectedMonth)}
+            {"\n"}작성된 일기가 없습니다.
           </Text>
-          <TouchableOpacity
-            style={styles.writeBtn}
-            onPress={() => navigation.navigate("Chat")}
-          >
-            <Ionicons name="create-outline" size={20} color="#fff" />
-            <Text style={styles.writeBtnText}>일기 작성하기</Text>
-          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -263,7 +212,6 @@ export default function HistoryScreen({ navigation }) {
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -277,11 +225,10 @@ export default function HistoryScreen({ navigation }) {
   );
 }
 
+// ---------------------- STYLE ----------------------
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F7FA",
-  },
+  container: { flex: 1, backgroundColor: "#F5F7FA" },
+
   header: {
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -289,90 +236,28 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
   },
+
   headerTitle: {
     fontSize: 24,
     fontWeight: "700",
     color: "#2C3E50",
   },
+
   monthSelector: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 14,
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
   },
-  monthBtn: {
-    padding: 8,
-  },
-  monthText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#2C3E50",
-  },
-  statsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 16,
-    backgroundColor: "#ffffff",
-    marginBottom: 8,
-  },
-  statItem: {
-    alignItems: "center",
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#4A90E2",
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#7F8C8D",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: "#7F8C8D",
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: "#95A5A6",
-    textAlign: "center",
-    marginTop: 16,
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  writeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#4A90E2",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
-    gap: 8,
-  },
-  writeBtnText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  listContent: {
-    padding: 16,
-  },
+
+  monthText: { fontSize: 18, fontWeight: "600", color: "#2C3E50" },
+
+  listContent: { padding: 16 },
+
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
@@ -384,73 +269,94 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+    position: "relative", // ⭐ 절대 위치 버튼 위해 꼭 필요
   },
+
+  deleteBtn: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    padding: 8,
+    backgroundColor: "white", // 클릭 방해 요소 제거
+    borderRadius: 16,
+    zIndex: 9999, // ⭐ 웹에서도 최상단 클릭되도록
+    elevation: 10,
+  },
+
   cardHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-  headerLeft: {
-    flexDirection: "row",
     alignItems: "center",
-    flex: 1,
+    marginBottom: 8,
   },
-  emoji: {
-    fontSize: 32,
-    marginRight: 12,
-  },
+
+  emoji: { fontSize: 32, marginRight: 10 },
+
   dateText: {
     fontSize: 14,
+    fontWeight: "600",
     color: "#2C3E50",
-    fontWeight: "600",
-    marginBottom: 4,
   },
-  sentimentLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  deleteBtn: {
-    padding: 8,
-  },
+
+  sentimentLabel: { fontSize: 12, fontWeight: "600", marginTop: 2 },
+
   contentText: {
     fontSize: 15,
     color: "#34495E",
     lineHeight: 22,
-    marginBottom: 12,
+    marginVertical: 10,
   },
+
   keywordsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 8,
   },
+
   keywordBadge: {
     backgroundColor: "#E8F4FD",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
-  keywordText: {
-    fontSize: 12,
-    color: "#4A90E2",
-    fontWeight: "600",
-  },
-  moreKeywords: {
-    fontSize: 12,
-    color: "#7F8C8D",
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
+
+  keywordText: { fontSize: 12, color: "#4A90E2", fontWeight: "600" },
+
+  moreKeywords: { fontSize: 12, color: "#7F8C8D" },
+
   viewMoreBtn: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
+    justifyContent: "flex-end",
   },
+
   viewMoreText: {
     fontSize: 14,
     color: "#4A90E2",
     fontWeight: "600",
+    marginRight: 4,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loadingText: { marginTop: 12, fontSize: 14, color: "#7F8C8D" },
+
+  emptyContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+
+  emptyText: {
+    fontSize: 16,
+    textAlign: "center",
+    marginTop: 16,
+    lineHeight: 24,
+    color: "#7F8C8D",
   },
 });
